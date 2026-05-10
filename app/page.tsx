@@ -42,19 +42,21 @@ export default function HomePage() {
       .catch((err) => console.error("Failed to load teams", err));
   }, []);
 
+  async function fetchSchedule(teamId: string): Promise<Match[]> {
+    const r = await fetch(`/api/schedule/${teamId}`);
+    if (!r.ok) throw new Error(`API returned ${r.status}`);
+    const data = await r.json();
+    if (!Array.isArray(data)) {
+      console.error("Schedule API returned non-array", data);
+      throw new Error("Unexpected response shape");
+    }
+    return data as Match[];
+  }
+
   const loadSchedule = useCallback((teamId: string) => {
     setMatchesLoading(true);
     setMatchesError(null);
-    fetch(`/api/schedule/${teamId}`)
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`API returned ${r.status}`);
-        const data = await r.json();
-        if (!Array.isArray(data)) {
-          console.error("Schedule API returned non-array", data);
-          throw new Error("Unexpected response shape");
-        }
-        return data as Match[];
-      })
+    fetchSchedule(teamId)
       .then((data) => {
         setMatches(data);
         setMatchesLoading(false);
@@ -67,11 +69,26 @@ export default function HomePage() {
       });
   }, []);
 
+  const refreshSchedule = useCallback((teamId: string) => {
+    fetchSchedule(teamId)
+      .then(setMatches)
+      .catch((err) => console.error("Schedule refresh failed", err));
+  }, []);
+
   useEffect(() => {
     if (phase === "home" && favoriteId) {
       loadSchedule(favoriteId);
     }
   }, [phase, favoriteId, loadSchedule]);
+
+  // While a match is in progress, poll for live updates.
+  useEffect(() => {
+    if (phase !== "home" || !favoriteId) return;
+    const hasLive = matches.some((m) => m.status === "in");
+    if (!hasLive) return;
+    const id = setInterval(() => refreshSchedule(favoriteId), 20000);
+    return () => clearInterval(id);
+  }, [phase, favoriteId, matches, refreshSchedule]);
 
   function handleTeamSelect(teamId: string) {
     setFavoriteTeam(teamId);
