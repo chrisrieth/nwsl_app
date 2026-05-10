@@ -105,12 +105,16 @@ function extractScore(raw: EspnCompetitor["score"]): string | undefined {
   return s;
 }
 
+function teamLogo(team: EspnTeam): string {
+  return team.logos?.[0]?.href || `https://a.espncdn.com/i/teamlogos/soccer/500/${team.id}.png`;
+}
+
 function mapCompetitor(c: EspnCompetitor) {
   return {
     id: c.team.id,
     name: c.team.displayName,
     abbr: c.team.abbreviation,
-    logo: c.team.logos?.[0]?.href ?? "",
+    logo: teamLogo(c.team),
     color: c.team.color ?? "1a1a2e",
     altColor: c.team.alternateColor ?? "ffffff",
     score: extractScore(c.score),
@@ -262,7 +266,7 @@ export async function fetchStandings(): Promise<StandingRow[]> {
       id: e.team.id,
       name: e.team.displayName,
       abbr: e.team.abbreviation,
-      logo: e.team.logos?.[0]?.href ?? "",
+      logo: teamLogo(e.team),
       color: e.team.color ?? "1a1a2e",
     },
     gp: statNumber(e.stats, "gamesPlayed"),
@@ -286,7 +290,7 @@ export async function fetchTeams(): Promise<Team[]> {
       name: t.team.displayName,
       shortName: t.team.shortDisplayName,
       abbr: t.team.abbreviation,
-      logo: t.team.logos?.[0]?.href ?? "",
+      logo: teamLogo(t.team),
       color: t.team.color ?? "1a1a2e",
       altColor: t.team.alternateColor ?? "ffffff",
     })
