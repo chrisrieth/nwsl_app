@@ -231,34 +231,62 @@ function statNumber(stats: EspnStandingEntry["stats"], name: string): number {
 
 function findStandingEntries(data: unknown): EspnStandingEntry[] {
   const out: EspnStandingEntry[] = [];
+  const seen = new WeakSet<object>();
+  const ids = new Set<string>();
+
   const visit = (node: unknown) => {
     if (!node || typeof node !== "object") return;
+    if (seen.has(node as object)) return;
+    seen.add(node as object);
+
     const obj = node as Record<string, unknown>;
-    const standings = obj.standings as { entries?: EspnStandingEntry[] } | undefined;
-    if (standings?.entries && Array.isArray(standings.entries)) {
-      out.push(...standings.entries);
+    // Heuristic: a standings entry has a team object and a stats array.
+    if (
+      obj.team &&
+      typeof obj.team === "object" &&
+      Array.isArray(obj.stats)
+    ) {
+      const entry = obj as unknown as EspnStandingEntry;
+      const id = entry.team?.id;
+      if (id && !ids.has(id)) {
+        ids.add(id);
+        out.push(entry);
+      }
+      return;
     }
-    if (Array.isArray(obj.children)) obj.children.forEach(visit);
-    if (Array.isArray(obj.groups)) obj.groups.forEach(visit);
+
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+    } else {
+      for (const key of Object.keys(obj)) visit(obj[key]);
+    }
   };
+
   visit(data);
   return out;
 }
 
 export async function fetchStandings(): Promise<StandingRow[]> {
   const year = new Date().getFullYear();
+  const ALT = "https://site.web.api.espn.com/apis/v2/sports/soccer/usa.nwsl";
   const urls = [
+    `${ALT}/standings?season=${year}`,
+    `${ALT}/standings`,
     `${BASE}/standings?season=${year}`,
     `${BASE}/standings`,
   ];
 
   let entries: EspnStandingEntry[] = [];
   for (const url of urls) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) continue;
-    const data = await res.json();
-    entries = findStandingEntries(data);
-    if (entries.length > 0) break;
+    try {
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) continue;
+      const data = await res.json();
+      entries = findStandingEntries(data);
+      if (entries.length > 0) break;
+    } catch {
+      // try next URL
+    }
   }
 
   return entries.map((e) => ({
