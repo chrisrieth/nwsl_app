@@ -145,6 +145,7 @@ export default function MatchCard({ match, anchor }: Props) {
         border: anchor ? "2px solid" : "none",
         borderColor: anchor ? "primary.main" : "transparent",
         bgcolor: match.status === "in" ? "rgba(229,57,53,0.04)" : gameDayHighlight ? "rgba(26,26,46,0.03)" : "background.paper",
+        scrollMarginTop: anchor ? 72 : 0,
       }}
     >
       <CardActionArea sx={{ px: 2, py: 1.5 }}>

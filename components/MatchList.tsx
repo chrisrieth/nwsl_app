@@ -42,10 +42,15 @@ export default function MatchList({ matches, emptyMessage = "No matches found." 
   const anchorRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const el = document.getElementById("anchor-match");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (matches.length === 0) return;
+    // Wait two frames so images/layout settle before scrolling.
+    const handle = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById("anchor-match");
+        if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    });
+    return () => cancelAnimationFrame(handle);
   }, [matches]);
 
   if (matches.length === 0) {
