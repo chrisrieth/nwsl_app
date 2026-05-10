@@ -147,31 +147,62 @@ export async function fetchScoreboard(): Promise<Match[]> {
   return (data.events ?? []).map(mapEvent).filter(Boolean) as Match[];
 }
 
+async function fetchEspnEvents(url: string): Promise<EspnEvent[]> {
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return data.events ?? [];
+  } catch {
+    return [];
+  }
+}
+
 export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
-  // ESPN's default schedule response truncates to completed games. Asking for
-  // the current season explicitly returns the full fixture list.
+  // ESPN's /teams/{id}/schedule endpoint only returns completed games. To pull
+  // in upcoming fixtures we also query the league scoreboard month-by-month and
+  // filter to events that involve this team.
   const year = new Date().getFullYear();
-  const urls = [
-    `${BASE}/teams/${teamId}/schedule?season=${year}&seasontype=2`,
-    `${BASE}/teams/${teamId}/schedule?season=${year}`,
-    `${BASE}/teams/${teamId}/schedule`,
-  ];
+  const today = new Date();
+
+  const teamScheduleUrl = `${BASE}/teams/${teamId}/schedule?season=${year}&seasontype=2`;
+
+  const fmtDay = (d: Date) =>
+    `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
+  const scoreboardUrls: string[] = [];
+  // One month back through eight months forward.
+  for (let i = -1; i < 8; i++) {
+    const start = new Date(today.getFullYear(), today.getMonth() + i, 1);
+    const end = new Date(today.getFullYear(), today.getMonth() + i + 1, 0);
+    scoreboardUrls.push(
+      `${BASE}/scoreboard?dates=${fmtDay(start)}-${fmtDay(end)}&limit=200`
+    );
+  }
+
+  const [teamEvents, ...scoreboardEventsByMonth] = await Promise.all([
+    fetchEspnEvents(teamScheduleUrl),
+    ...scoreboardUrls.map(fetchEspnEvents),
+  ]);
 
   const seen = new Set<string>();
   const all: Match[] = [];
-  for (const url of urls) {
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) continue;
-    const data = await res.json();
-    const events: EspnEvent[] = data.events ?? [];
+
+  for (const ev of teamEvents) {
+    const m = mapEvent(ev);
+    if (m && !seen.has(m.id)) {
+      seen.add(m.id);
+      all.push(m);
+    }
+  }
+
+  for (const events of scoreboardEventsByMonth) {
     for (const ev of events) {
       const m = mapEvent(ev);
-      if (m && !seen.has(m.id)) {
-        seen.add(m.id);
-        all.push(m);
-      }
+      if (!m || seen.has(m.id)) continue;
+      if (m.homeTeam.id !== teamId && m.awayTeam.id !== teamId) continue;
+      seen.add(m.id);
+      all.push(m);
     }
-    if (all.some((m) => m.status === "pre")) break;
   }
 
   all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
