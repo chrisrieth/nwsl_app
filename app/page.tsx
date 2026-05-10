@@ -44,7 +44,7 @@ export default function HomePage() {
     fetch(`/api/schedule/${teamId}`)
       .then((r) => r.json())
       .then((data: Match[]) => {
-        setMatches(data);
+        setMatches(Array.isArray(data) ? data : []);
         setMatchesLoading(false);
       })
       .catch(() => setMatchesLoading(false));

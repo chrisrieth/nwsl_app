@@ -101,10 +101,12 @@ function mapCompetitor(c: EspnCompetitor) {
   };
 }
 
-export function mapEvent(event: EspnEvent): Match {
-  const comp = event.competitions[0];
-  const home = comp.competitors.find((c) => c.homeAway === "home")!;
-  const away = comp.competitors.find((c) => c.homeAway === "away")!;
+export function mapEvent(event: EspnEvent): Match | null {
+  const comp = event.competitions?.[0];
+  if (!comp) return null;
+  const home = comp.competitors.find((c) => c.homeAway === "home");
+  const away = comp.competitors.find((c) => c.homeAway === "away");
+  if (!home || !away) return null;
   return {
     id: event.id,
     date: comp.date,
@@ -126,7 +128,7 @@ export async function fetchScoreboard(): Promise<Match[]> {
   const res = await fetch(`${BASE}/scoreboard?limit=100`, { next: { revalidate: 60 } });
   if (!res.ok) return [];
   const data = await res.json();
-  return (data.events ?? []).map(mapEvent);
+  return (data.events ?? []).map(mapEvent).filter(Boolean) as Match[];
 }
 
 export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
@@ -134,7 +136,7 @@ export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
   if (!res.ok) return [];
   const data = await res.json();
   const events: EspnEvent[] = data.events ?? [];
-  return events.map(mapEvent);
+  return events.map(mapEvent).filter(Boolean) as Match[];
 }
 
 export async function fetchStandings(): Promise<StandingRow[]> {
