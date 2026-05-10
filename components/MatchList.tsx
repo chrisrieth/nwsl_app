@@ -40,9 +40,11 @@ function groupLabel(dateStr: string): string {
 
 export default function MatchList({ matches, emptyMessage = "No matches found." }: Props) {
   const anchorRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScrollRef = useRef(false);
 
   useEffect(() => {
-    if (matches.length === 0) return;
+    if (matches.length === 0 || didInitialScrollRef.current) return;
+    didInitialScrollRef.current = true;
     // Wait two frames so images/layout settle before scrolling.
     const handle = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
