@@ -58,7 +58,7 @@ export interface EspnEvent {
 
 export interface EspnStandingEntry {
   team: EspnTeam;
-  stats: { name: string; displayValue: string; value: number }[];
+  stats: { name: string; displayValue?: string; value?: number | string }[];
 }
 
 export interface Match {
@@ -209,32 +209,71 @@ export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
   return all;
 }
 
+function statNumber(stats: EspnStandingEntry["stats"], name: string): number {
+  const s = stats.find((x) => x.name === name);
+  if (!s) return 0;
+  if (typeof s.value === "number") return s.value;
+  if (typeof s.value === "string") {
+    const n = parseFloat(s.value);
+    return Number.isFinite(n) ? n : 0;
+  }
+  // ESPN sometimes wraps stat values in an object like score does.
+  if (s.displayValue) {
+    const n = parseFloat(s.displayValue);
+    return Number.isFinite(n) ? n : 0;
+  }
+  return 0;
+}
+
+function findStandingEntries(data: unknown): EspnStandingEntry[] {
+  const out: EspnStandingEntry[] = [];
+  const visit = (node: unknown) => {
+    if (!node || typeof node !== "object") return;
+    const obj = node as Record<string, unknown>;
+    const standings = obj.standings as { entries?: EspnStandingEntry[] } | undefined;
+    if (standings?.entries && Array.isArray(standings.entries)) {
+      out.push(...standings.entries);
+    }
+    if (Array.isArray(obj.children)) obj.children.forEach(visit);
+    if (Array.isArray(obj.groups)) obj.groups.forEach(visit);
+  };
+  visit(data);
+  return out;
+}
+
 export async function fetchStandings(): Promise<StandingRow[]> {
-  const res = await fetch(`${BASE}/standings`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json();
-  const entries: EspnStandingEntry[] =
-    data.standings?.entries ?? data.children?.[0]?.standings?.entries ?? [];
-  return entries.map((e) => {
-    const stat = (name: string) => e.stats.find((s) => s.name === name);
-    return {
-      team: {
-        id: e.team.id,
-        name: e.team.displayName,
-        abbr: e.team.abbreviation,
-        logo: e.team.logos?.[0]?.href ?? "",
-        color: e.team.color ?? "1a1a2e",
-      },
-      gp: stat("gamesPlayed")?.value ?? 0,
-      w: stat("wins")?.value ?? 0,
-      d: stat("ties")?.value ?? 0,
-      l: stat("losses")?.value ?? 0,
-      gf: stat("pointsFor")?.value ?? 0,
-      ga: stat("pointsAgainst")?.value ?? 0,
-      gd: stat("pointDifferential")?.value ?? 0,
-      pts: stat("points")?.value ?? 0,
-    };
-  });
+  const year = new Date().getFullYear();
+  const urls = [
+    `${BASE}/standings?season=${year}`,
+    `${BASE}/standings`,
+  ];
+
+  let entries: EspnStandingEntry[] = [];
+  for (const url of urls) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) continue;
+    const data = await res.json();
+    entries = findStandingEntries(data);
+    if (entries.length > 0) break;
+  }
+
+  return entries.map((e) => ({
+    team: {
+      id: e.team.id,
+      name: e.team.displayName,
+      abbr: e.team.abbreviation,
+      logo: e.team.logos?.[0]?.href ?? "",
+      color: e.team.color ?? "1a1a2e",
+    },
+    gp: statNumber(e.stats, "gamesPlayed"),
+    w: statNumber(e.stats, "wins"),
+    d: statNumber(e.stats, "ties"),
+    l: statNumber(e.stats, "losses"),
+    gf: statNumber(e.stats, "pointsFor"),
+    ga: statNumber(e.stats, "pointsAgainst"),
+    gd: statNumber(e.stats, "pointDifferential"),
+    pts: statNumber(e.stats, "points"),
+  }));
 }
 
 export async function fetchTeams(): Promise<Team[]> {
