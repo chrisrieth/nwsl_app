@@ -125,14 +125,14 @@ export function mapEvent(event: EspnEvent): Match | null {
 }
 
 export async function fetchScoreboard(): Promise<Match[]> {
-  const res = await fetch(`${BASE}/scoreboard?limit=100`, { next: { revalidate: 60 } });
+  const res = await fetch(`${BASE}/scoreboard?limit=100`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.events ?? []).map(mapEvent).filter(Boolean) as Match[];
 }
 
 export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
-  const res = await fetch(`${BASE}/teams/${teamId}/schedule`, { next: { revalidate: 300 } });
+  const res = await fetch(`${BASE}/teams/${teamId}/schedule`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
   const events: EspnEvent[] = data.events ?? [];
@@ -140,7 +140,7 @@ export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
 }
 
 export async function fetchStandings(): Promise<StandingRow[]> {
-  const res = await fetch(`${BASE}/standings`, { next: { revalidate: 300 } });
+  const res = await fetch(`${BASE}/standings`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
   const entries: EspnStandingEntry[] =
@@ -168,7 +168,7 @@ export async function fetchStandings(): Promise<StandingRow[]> {
 }
 
 export async function fetchTeams(): Promise<Team[]> {
-  const res = await fetch(`${BASE}/teams?limit=50`, { next: { revalidate: 3600 } });
+  const res = await fetch(`${BASE}/teams?limit=50`, { cache: "no-store" });
   if (!res.ok) return [];
   const data = await res.json();
   return (data.sports?.[0]?.leagues?.[0]?.teams ?? []).map(

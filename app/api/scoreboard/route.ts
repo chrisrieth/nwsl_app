@@ -1,9 +1,14 @@
 import { fetchScoreboard } from "@/lib/espn";
 import { NextResponse } from "next/server";
 
-export const revalidate = 60;
+export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const matches = await fetchScoreboard();
-  return NextResponse.json(matches);
+  try {
+    const matches = await fetchScoreboard();
+    return NextResponse.json(matches);
+  } catch (err) {
+    console.error("fetchScoreboard failed", err);
+    return NextResponse.json([], { status: 200 });
+  }
 }

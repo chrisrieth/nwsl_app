@@ -14,11 +14,14 @@ export default function TeamsPage() {
   useEffect(() => {
     fetch("/api/teams")
       .then((r) => r.json())
-      .then((data: Team[]) => {
-        setTeams(data);
+      .then((data) => {
+        setTeams(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load teams", err);
+        setLoading(false);
+      });
   }, []);
 
   return (

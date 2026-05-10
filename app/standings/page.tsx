@@ -23,11 +23,14 @@ export default function StandingsPage() {
   useEffect(() => {
     fetch("/api/standings")
       .then((r) => r.json())
-      .then((data: StandingRow[]) => {
-        setRows(data);
+      .then((data) => {
+        setRows(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load standings", err);
+        setLoading(false);
+      });
   }, []);
 
   return (
