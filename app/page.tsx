@@ -8,11 +8,13 @@ import TeamPicker from "@/components/TeamPicker";
 import AppBar from "@/components/AppBar";
 import {
   Box,
+  Button,
   CircularProgress,
   Dialog,
   DialogTitle,
   DialogContent,
   Skeleton,
+  Typography,
 } from "@mui/material";
 
 type Phase = "loading" | "pick" | "home";
@@ -23,6 +25,7 @@ export default function HomePage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [matches, setMatches] = useState<Match[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(false);
+  const [matchesError, setMatchesError] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   useEffect(() => {
@@ -35,19 +38,33 @@ export default function HomePage() {
     }
     fetch("/api/teams")
       .then((r) => r.json())
-      .then(setTeams)
-      .catch(console.error);
+      .then((data) => setTeams(Array.isArray(data) ? data : []))
+      .catch((err) => console.error("Failed to load teams", err));
   }, []);
 
   const loadSchedule = useCallback((teamId: string) => {
     setMatchesLoading(true);
+    setMatchesError(null);
     fetch(`/api/schedule/${teamId}`)
-      .then((r) => r.json())
-      .then((data: Match[]) => {
-        setMatches(Array.isArray(data) ? data : []);
+      .then(async (r) => {
+        if (!r.ok) throw new Error(`API returned ${r.status}`);
+        const data = await r.json();
+        if (!Array.isArray(data)) {
+          console.error("Schedule API returned non-array", data);
+          throw new Error("Unexpected response shape");
+        }
+        return data as Match[];
+      })
+      .then((data) => {
+        setMatches(data);
         setMatchesLoading(false);
       })
-      .catch(() => setMatchesLoading(false));
+      .catch((err) => {
+        console.error("Failed to load schedule", err);
+        setMatches([]);
+        setMatchesError(err instanceof Error ? err.message : "Failed to load schedule");
+        setMatchesLoading(false);
+      });
   }, []);
 
   useEffect(() => {
@@ -104,6 +121,32 @@ export default function HomePage() {
           {[...Array(5)].map((_, i) => (
             <Skeleton key={i} variant="rectangular" height={100} sx={{ mb: 1.5, borderRadius: 2 }} />
           ))}
+        </Box>
+      ) : matchesError ? (
+        <Box sx={{ textAlign: "center", py: 6, px: 3 }}>
+          <Typography variant="body1" gutterBottom>
+            Could not load schedule.
+          </Typography>
+          <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 2 }}>
+            {matchesError}
+          </Typography>
+          <Button variant="contained" onClick={() => favoriteId && loadSchedule(favoriteId)}>
+            Retry
+          </Button>
+        </Box>
+      ) : matches.length === 0 ? (
+        <Box sx={{ textAlign: "center", py: 6, px: 3 }}>
+          <Typography variant="body1" gutterBottom>
+            No schedule data available yet.
+          </Typography>
+          <Button
+            variant="outlined"
+            size="small"
+            sx={{ mt: 1 }}
+            onClick={() => favoriteId && loadSchedule(favoriteId)}
+          >
+            Refresh
+          </Button>
         </Box>
       ) : (
         <MatchList matches={matches} emptyMessage="No schedule data available yet." />

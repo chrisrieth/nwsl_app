@@ -23,19 +23,23 @@ export default function TeamPage({ params }: { params: Promise<{ id: string }> }
 
     fetch("/api/teams")
       .then((r) => r.json())
-      .then((teams: Team[]) => {
-        const found = teams.find((t) => t.id === id);
+      .then((teams) => {
+        if (!Array.isArray(teams)) return;
+        const found = teams.find((t: Team) => t.id === id);
         if (found) setTeam(found);
       })
       .catch(console.error);
 
     fetch(`/api/schedule/${id}`)
       .then((r) => r.json())
-      .then((data: Match[]) => {
-        setMatches(data);
+      .then((data) => {
+        setMatches(Array.isArray(data) ? data : []);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
+      .catch((err) => {
+        console.error("Failed to load team schedule", err);
+        setLoading(false);
+      });
   }, [id]);
 
   function toggleFavorite() {
