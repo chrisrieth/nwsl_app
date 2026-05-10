@@ -10,10 +10,18 @@ export interface EspnTeam {
   logos: { href: string }[];
 }
 
+export interface EspnCompetitorScore {
+  value?: string | number;
+  displayValue?: string;
+  winner?: boolean;
+  source?: string;
+  $ref?: string;
+}
+
 export interface EspnCompetitor {
   id: string;
   homeAway: "home" | "away";
-  score?: string;
+  score?: string | EspnCompetitorScore;
   team: EspnTeam;
   records?: { summary: string }[];
 }
@@ -89,6 +97,14 @@ export interface Team {
   altColor: string;
 }
 
+function extractScore(raw: EspnCompetitor["score"]): string | undefined {
+  if (raw == null) return undefined;
+  if (typeof raw === "string") return raw;
+  // ESPN sometimes returns score as an object
+  const s = raw.displayValue ?? (raw.value != null ? String(raw.value) : undefined);
+  return s;
+}
+
 function mapCompetitor(c: EspnCompetitor) {
   return {
     id: c.team.id,
@@ -97,7 +113,7 @@ function mapCompetitor(c: EspnCompetitor) {
     logo: c.team.logos?.[0]?.href ?? "",
     color: c.team.color ?? "1a1a2e",
     altColor: c.team.alternateColor ?? "ffffff",
-    score: c.score,
+    score: extractScore(c.score),
   };
 }
 
