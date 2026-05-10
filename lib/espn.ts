@@ -148,11 +148,34 @@ export async function fetchScoreboard(): Promise<Match[]> {
 }
 
 export async function fetchTeamSchedule(teamId: string): Promise<Match[]> {
-  const res = await fetch(`${BASE}/teams/${teamId}/schedule`, { cache: "no-store" });
-  if (!res.ok) return [];
-  const data = await res.json();
-  const events: EspnEvent[] = data.events ?? [];
-  return events.map(mapEvent).filter(Boolean) as Match[];
+  // ESPN's default schedule response truncates to completed games. Asking for
+  // the current season explicitly returns the full fixture list.
+  const year = new Date().getFullYear();
+  const urls = [
+    `${BASE}/teams/${teamId}/schedule?season=${year}&seasontype=2`,
+    `${BASE}/teams/${teamId}/schedule?season=${year}`,
+    `${BASE}/teams/${teamId}/schedule`,
+  ];
+
+  const seen = new Set<string>();
+  const all: Match[] = [];
+  for (const url of urls) {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) continue;
+    const data = await res.json();
+    const events: EspnEvent[] = data.events ?? [];
+    for (const ev of events) {
+      const m = mapEvent(ev);
+      if (m && !seen.has(m.id)) {
+        seen.add(m.id);
+        all.push(m);
+      }
+    }
+    if (all.some((m) => m.status === "pre")) break;
+  }
+
+  all.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return all;
 }
 
 export async function fetchStandings(): Promise<StandingRow[]> {
