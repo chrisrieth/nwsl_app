@@ -1,13 +1,7 @@
 "use client";
 
 import { Match } from "@/lib/espn";
-import {
-  Box,
-  Card,
-  CardActionArea,
-  Chip,
-  Typography,
-} from "@mui/material";
+import { Box } from "@mui/material";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
 interface Props {
@@ -19,166 +13,272 @@ function isToday(dateStr: string) {
   return differenceInCalendarDays(parseISO(dateStr), new Date()) === 0;
 }
 
-function isYesterday(dateStr: string) {
-  return differenceInCalendarDays(parseISO(dateStr), new Date()) === -1;
-}
-
 function isTomorrow(dateStr: string) {
   return differenceInCalendarDays(parseISO(dateStr), new Date()) === 1;
 }
 
-function formatMatchDate(dateStr: string) {
-  const d = parseISO(dateStr);
-  if (isToday(dateStr)) return format(d, "h:mm a");
-  if (isYesterday(dateStr)) return `Yesterday · ${format(d, "h:mm a")}`;
-  if (isTomorrow(dateStr)) return `Tomorrow · ${format(d, "h:mm a")}`;
-  return format(d, "EEE, MMM d · h:mm a");
+function isYesterday(dateStr: string) {
+  return differenceInCalendarDays(parseISO(dateStr), new Date()) === -1;
 }
 
-function StatusChip({ match }: { match: Match }) {
-  if (match.status === "in") {
-    return (
-      <Chip
-        label={match.statusText}
-        size="small"
-        sx={{
-          bgcolor: "#e53935",
-          color: "#fff",
-          fontWeight: 700,
-          fontSize: "0.7rem",
-          animation: "pulse 1.5s ease-in-out infinite",
-          "@keyframes pulse": {
-            "0%, 100%": { opacity: 1 },
-            "50%": { opacity: 0.6 },
-          },
-        }}
-      />
-    );
-  }
-  if (match.status === "post") {
-    return (
-      <Chip
-        label="Final"
-        size="small"
-        sx={{ bgcolor: "grey.200", color: "text.secondary", fontWeight: 600, fontSize: "0.7rem" }}
-      />
-    );
-  }
-  return null;
+function formatMatchTime(dateStr: string) {
+  return format(parseISO(dateStr), "h:mm a");
 }
 
-function TeamRow({
-  team,
-  score,
-  isWinner,
-  status,
-}: {
-  team: Match["homeTeam"];
-  score?: string;
-  isWinner: boolean;
-  status: Match["status"];
-}) {
+function Burst({ size = 64, color = "#FF2D55" }: { size?: number; color?: string }) {
+  const spikes = 16;
+  const pts: string[] = [];
+  for (let i = 0; i < spikes * 2; i++) {
+    const r = (i % 2 === 0 ? 0.5 : 0.33) * size;
+    const ang = (i / (spikes * 2)) * Math.PI * 2;
+    pts.push(`${size / 2 + Math.cos(ang) * r},${size / 2 + Math.sin(ang) * r}`);
+  }
   return (
-    <Box sx={{ display: "flex", alignItems: "center", gap: 1.5, py: 0.5 }}>
-      {team.logo ? (
-        <Box
-          component="img"
-          src={team.logo}
-          alt={team.abbr}
-          sx={{ width: 32, height: 32, objectFit: "contain", flexShrink: 0 }}
-        />
-      ) : (
-        <Box
-          sx={{
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            bgcolor: `#${team.color}`,
-            flexShrink: 0,
-          }}
-        />
-      )}
-      <Typography
-        variant="body1"
-        sx={{
-          flex: 1,
-          fontWeight: isWinner ? 700 : 400,
-          color: status === "post" && !isWinner ? "text.secondary" : "text.primary",
-        }}
-      >
-        {team.name}
-      </Typography>
-      {score !== undefined && (
-        <Typography
-          variant="h6"
-          component="span"
-          sx={{
-            fontWeight: isWinner ? 700 : 400,
-            minWidth: 28,
-            textAlign: "right",
-            color: status === "post" && !isWinner ? "text.secondary" : "text.primary",
-          }}
-        >
-          {score}
-        </Typography>
-      )}
-    </Box>
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      style={{ position: "absolute", top: -6, right: -10, pointerEvents: "none", zIndex: 0 }}
+    >
+      <polygon points={pts.join(" ")} fill={color} stroke="#0a0a0a" strokeWidth="2" strokeLinejoin="miter" />
+    </svg>
   );
 }
 
 export default function MatchCard({ match, anchor }: Props) {
+  const accent = `#${match.homeTeam.color || "FF2D55"}`;
+  const isLive = match.status === "in";
+  const isFinal = match.status === "post";
+
   const homeScore = match.homeTeam.score !== undefined ? parseInt(match.homeTeam.score) : null;
   const awayScore = match.awayTeam.score !== undefined ? parseInt(match.awayTeam.score) : null;
 
-  const homeWins =
-    match.status === "post" && homeScore !== null && awayScore !== null && homeScore > awayScore;
-  const awayWins =
-    match.status === "post" && homeScore !== null && awayScore !== null && awayScore > homeScore;
+  const homeWins = isFinal && homeScore !== null && awayScore !== null && homeScore > awayScore;
+  const awayWins = isFinal && homeScore !== null && awayScore !== null && awayScore > homeScore;
 
-  const gameDayHighlight = isToday(match.date) || isYesterday(match.date) || isTomorrow(match.date);
+  const today = isToday(match.date);
+  const tomorrow = isTomorrow(match.date);
+  const yesterday = isYesterday(match.date);
+
+  let topBadge: { label: string; bg: string; color: string } | null = null;
+  if (isLive) {
+    topBadge = { label: `● LIVE · ${match.statusText}`, bg: accent, color: "#0a0a0a" };
+  } else if (isFinal) {
+    topBadge = { label: "FINAL", bg: "#1a1a1a", color: "#555" };
+  } else if (today) {
+    topBadge = { label: "TODAY", bg: accent, color: "#0a0a0a" };
+  } else if (tomorrow) {
+    topBadge = { label: "TOMORROW", bg: "#1a1a1a", color: "#fff" };
+  } else if (yesterday) {
+    topBadge = { label: "YESTERDAY", bg: "#1a1a1a", color: "#555" };
+  }
 
   return (
-    <Card
+    <Box
       id={anchor ? "anchor-match" : undefined}
       sx={{
         mb: 1.5,
-        border: anchor ? "2px solid" : "none",
-        borderColor: anchor ? "primary.main" : "transparent",
-        bgcolor: match.status === "in" ? "rgba(229,57,53,0.04)" : gameDayHighlight ? "rgba(26,26,46,0.03)" : "background.paper",
+        scrollMarginTop: anchor ? 72 : 0,
+        position: "relative",
+        clipPath: "polygon(0 14px, 100% 0, 100% calc(100% - 14px), 0 100%)",
+        bgcolor: "#111111",
+        px: 2,
+        pt: topBadge ? "22px" : "14px",
+        pb: "14px",
+        outline: anchor ? `2px solid ${accent}` : "none",
+        boxShadow: isLive ? `0 0 24px ${accent}44` : "none",
       }}
     >
-      <CardActionArea sx={{ px: 2, py: 1.5 }}>
-        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
-          <Typography variant="caption" color="text.secondary">
-            {formatMatchDate(match.date)}
-          </Typography>
+      {/* Status badge */}
+      {topBadge && (
+        <Box
+          sx={{
+            position: "absolute",
+            top: -1,
+            right: 18,
+            px: "10px",
+            py: "3px",
+            bgcolor: topBadge.bg,
+            color: topBadge.color,
+            fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+            fontSize: "0.6rem",
+            letterSpacing: "0.10em",
+            clipPath: "polygon(12% 0, 100% 0, 88% 100%, 0 100%)",
+            ...(isLive && {
+              animation: "kpulse 1.5s ease-in-out infinite",
+              "@keyframes kpulse": {
+                "0%, 100%": { opacity: 1 },
+                "50%": { opacity: 0.65 },
+              },
+            }),
+          }}
+        >
+          {topBadge.label}
+        </Box>
+      )}
+
+      {/* Main score grid */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: "1fr auto 1fr",
+          alignItems: "center",
+          gap: 1,
+          position: "relative",
+        }}
+      >
+        {/* Home team */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
           <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            {gameDayHighlight && match.status === "pre" && isToday(match.date) && (
-              <Chip label="TODAY" size="small" color="primary" sx={{ fontWeight: 700, fontSize: "0.65rem" }} />
+            {match.homeTeam.logo && (
+              <Box
+                component="img"
+                src={match.homeTeam.logo}
+                alt={match.homeTeam.abbr}
+                sx={{ width: 26, height: 26, objectFit: "contain", flexShrink: 0 }}
+              />
             )}
-            <StatusChip match={match} />
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "0.75rem",
+                color: isFinal && !homeWins ? "#444" : "#fff",
+                letterSpacing: "0.04em",
+                lineHeight: 1,
+              }}
+            >
+              {match.homeTeam.abbr.toUpperCase()}
+            </Box>
           </Box>
+          {(isLive || isFinal) && homeScore !== null && (
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "2.8rem",
+                lineHeight: 0.85,
+                color: isLive ? accent : homeWins ? "#fff" : "#444",
+                transform: "skewX(-6deg)",
+                display: "inline-block",
+              }}
+            >
+              {homeScore}
+            </Box>
+          )}
         </Box>
 
-        <TeamRow
-          team={match.awayTeam}
-          score={match.awayTeam.score}
-          isWinner={awayWins}
-          status={match.status}
-        />
-        <TeamRow
-          team={match.homeTeam}
-          score={match.homeTeam.score}
-          isWinner={homeWins}
-          status={match.status}
-        />
+        {/* Center */}
+        <Box sx={{ textAlign: "center", position: "relative", minWidth: 40 }}>
+          {isLive && <Burst size={60} color={accent} />}
+          {isLive || isFinal ? (
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "1.1rem",
+                color: "#333",
+                transform: "skewX(-6deg)",
+                position: "relative",
+                zIndex: 1,
+              }}
+            >
+              –
+            </Box>
+          ) : (
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "0.65rem",
+                color: "#555",
+                letterSpacing: "0.06em",
+              }}
+            >
+              {formatMatchTime(match.date)}
+            </Box>
+          )}
+        </Box>
 
-        {match.venue && (
-          <Typography variant="caption" color="text.disabled" sx={{ mt: 0.5, display: "block" }}>
-            {match.city ?? match.venue}
-          </Typography>
-        )}
-      </CardActionArea>
-    </Card>
+        {/* Away team */}
+        <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5, alignItems: "flex-end" }}>
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexDirection: "row-reverse" }}>
+            {match.awayTeam.logo && (
+              <Box
+                component="img"
+                src={match.awayTeam.logo}
+                alt={match.awayTeam.abbr}
+                sx={{ width: 26, height: 26, objectFit: "contain", flexShrink: 0 }}
+              />
+            )}
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "0.75rem",
+                color: isFinal && !awayWins ? "#444" : "#fff",
+                letterSpacing: "0.04em",
+                lineHeight: 1,
+                textAlign: "right",
+              }}
+            >
+              {match.awayTeam.abbr.toUpperCase()}
+            </Box>
+          </Box>
+          {(isLive || isFinal) && awayScore !== null && (
+            <Box
+              sx={{
+                fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                fontSize: "2.8rem",
+                lineHeight: 0.85,
+                color: isLive ? "#fff" : awayWins ? "#fff" : "#444",
+                transform: "skewX(-6deg)",
+                display: "inline-block",
+                opacity: isLive ? 0.55 : 1,
+              }}
+            >
+              {awayScore}
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Full team names row */}
+      <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", mt: 0.75 }}>
+        <Box
+          sx={{
+            fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+            fontSize: "0.6rem",
+            letterSpacing: "0.05em",
+            color: "#3a3a3a",
+          }}
+        >
+          {match.homeTeam.name.toUpperCase()}
+        </Box>
+        <Box
+          sx={{
+            fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+            fontSize: "0.6rem",
+            letterSpacing: "0.05em",
+            color: "#3a3a3a",
+            textAlign: "right",
+          }}
+        >
+          {match.awayTeam.name.toUpperCase()}
+        </Box>
+      </Box>
+
+      {/* Venue */}
+      {match.venue && (
+        <Box
+          sx={{
+            mt: 1,
+            pt: 0.75,
+            borderTop: `1px dashed ${accent}33`,
+            fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+            fontSize: "0.55rem",
+            letterSpacing: "0.10em",
+            color: "#3a3a3a",
+          }}
+        >
+          {(match.city ?? match.venue).toUpperCase()}
+        </Box>
+      )}
+    </Box>
   );
 }

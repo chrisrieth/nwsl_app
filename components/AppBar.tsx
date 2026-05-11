@@ -1,8 +1,8 @@
 "use client";
 
-import { AppBar as MuiAppBar, Toolbar, Typography, IconButton, Box } from "@mui/material";
-import SettingsIcon from "@mui/icons-material/Settings";
+import { Box, IconButton } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import SettingsIcon from "@mui/icons-material/Settings";
 import { useRouter } from "next/navigation";
 
 interface Props {
@@ -15,40 +15,82 @@ interface Props {
 
 export default function AppBar({ title, subtitle, showBack, onSettingsClick, teamColor }: Props) {
   const router = useRouter();
+  const accent = teamColor ? `#${teamColor}` : "#FF2D55";
 
   return (
-    <MuiAppBar
-      position="sticky"
-      sx={{ bgcolor: teamColor ? `#${teamColor}` : "primary.main" }}
-      elevation={0}
+    <Box
+      component="header"
+      sx={{
+        position: "sticky",
+        top: 0,
+        zIndex: 1100,
+        bgcolor: "#0a0a0a",
+        borderBottom: `3px solid ${accent}`,
+        px: 2,
+        py: 1.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 1.5,
+      }}
     >
-      <Toolbar>
-        {showBack && (
-          <IconButton
-            edge="start"
-            color="inherit"
-            onClick={() => router.back()}
-            sx={{ mr: 1 }}
-          >
-            <ArrowBackIcon />
-          </IconButton>
-        )}
-        <Box sx={{ flex: 1 }}>
-          <Typography variant="h6" component="div" sx={{ lineHeight: 1.2 }}>
-            {title}
-          </Typography>
-          {subtitle && (
-            <Typography variant="caption" sx={{ opacity: 0.8 }}>
-              {subtitle}
-            </Typography>
-          )}
+      {showBack && (
+        <IconButton
+          onClick={() => router.back()}
+          size="small"
+          sx={{ color: accent, mr: 0.5, p: 0.5 }}
+        >
+          <ArrowBackIcon />
+        </IconButton>
+      )}
+
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Box
+          sx={{
+            fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+            fontSize: "1.5rem",
+            lineHeight: 1,
+            color: "#fff",
+            transform: "skewX(-8deg)",
+            display: "inline-block",
+            letterSpacing: "-0.02em",
+          }}
+        >
+          {title.toUpperCase()}
         </Box>
-        {onSettingsClick && (
-          <IconButton color="inherit" onClick={onSettingsClick}>
-            <SettingsIcon />
-          </IconButton>
+        {/* Accent triangle beside title */}
+        <Box
+          component="span"
+          sx={{
+            display: "inline-block",
+            ml: 1,
+            width: 0,
+            height: 0,
+            borderTop: "7px solid transparent",
+            borderBottom: "7px solid transparent",
+            borderLeft: `10px solid ${accent}`,
+            verticalAlign: "middle",
+          }}
+        />
+        {subtitle && (
+          <Box
+            sx={{
+              fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+              fontSize: "0.65rem",
+              letterSpacing: "0.10em",
+              color: accent,
+              mt: 0.25,
+            }}
+          >
+            {subtitle.toUpperCase()}
+          </Box>
         )}
-      </Toolbar>
-    </MuiAppBar>
+      </Box>
+
+      {onSettingsClick && (
+        <IconButton onClick={onSettingsClick} size="small" sx={{ color: "#555" }}>
+          <SettingsIcon fontSize="small" />
+        </IconButton>
+      )}
+    </Box>
   );
 }

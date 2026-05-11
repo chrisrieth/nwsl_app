@@ -2,7 +2,7 @@
 
 import { Match } from "@/lib/espn";
 import MatchCard from "./MatchCard";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { useEffect, useRef } from "react";
 import { differenceInCalendarDays, parseISO } from "date-fns";
 
@@ -12,17 +12,12 @@ interface Props {
 }
 
 function findAnchorIndex(matches: Match[]): number {
-  const now = new Date();
-
-  // First: any in-progress match
   const inProgress = matches.findIndex((m) => m.status === "in");
   if (inProgress !== -1) return inProgress;
 
-  // Next: soonest upcoming match
   const upcoming = matches.findIndex((m) => m.status === "pre");
   if (upcoming !== -1) return upcoming;
 
-  // Fallback: last completed match
   for (let i = matches.length - 1; i >= 0; i--) {
     if (matches[i].status === "post") return i;
   }
@@ -39,26 +34,39 @@ function groupLabel(dateStr: string): string {
 }
 
 export default function MatchList({ matches, emptyMessage = "No matches found." }: Props) {
-  const anchorRef = useRef<HTMLDivElement | null>(null);
+  const didInitialScrollRef = useRef(false);
 
   useEffect(() => {
-    const el = document.getElementById("anchor-match");
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
+    if (matches.length === 0 || didInitialScrollRef.current) return;
+    didInitialScrollRef.current = true;
+    const handle = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const el = document.getElementById("anchor-match");
+        if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+      });
+    });
+    return () => cancelAnimationFrame(handle);
   }, [matches]);
 
   if (matches.length === 0) {
     return (
-      <Box sx={{ textAlign: "center", py: 6, color: "text.secondary" }}>
-        <Typography>{emptyMessage}</Typography>
+      <Box
+        sx={{
+          textAlign: "center",
+          py: 6,
+          fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+          fontSize: "0.75rem",
+          letterSpacing: "0.10em",
+          color: "#444",
+        }}
+      >
+        {emptyMessage.toUpperCase()}
       </Box>
     );
   }
 
   const anchorIndex = findAnchorIndex(matches);
 
-  // Group matches by date
   const groups: { label: string; matches: { match: Match; originalIndex: number }[] }[] = [];
   let lastLabel = "";
   for (let i = 0; i < matches.length; i++) {
@@ -72,34 +80,56 @@ export default function MatchList({ matches, emptyMessage = "No matches found." 
 
   return (
     <Box>
-      {groups.map((group) => (
-        <Box key={group.label}>
-          <Typography
-            variant="overline"
-            sx={{
-              display: "block",
-              px: 2,
-              pt: 2,
-              pb: 0.5,
-              color: "text.secondary",
-              fontWeight: 600,
-              letterSpacing: "0.08em",
-            }}
-          >
-            {group.label}
-          </Typography>
-          <Box sx={{ px: 2 }}>
-            {group.matches.map(({ match, originalIndex }) => (
-              <MatchCard
-                key={match.id}
-                match={match}
-                anchor={originalIndex === anchorIndex}
+      {groups.map((group) => {
+        const isSpecial = group.label === "Today" || group.label === "Tomorrow" || group.label === "Yesterday";
+        return (
+          <Box key={group.label}>
+            <Box
+              sx={{
+                px: 2,
+                pt: 2,
+                pb: 0.75,
+                display: "flex",
+                alignItems: "center",
+                gap: 1.5,
+              }}
+            >
+              <Box
+                sx={{
+                  width: 0,
+                  height: 0,
+                  borderTop: "7px solid transparent",
+                  borderBottom: "7px solid transparent",
+                  borderLeft: `10px solid ${isSpecial ? "#FF2D55" : "#333"}`,
+                  flexShrink: 0,
+                }}
               />
-            ))}
+              <Box
+                sx={{
+                  fontFamily: "var(--font-archivo-black), 'Archivo Black', system-ui, sans-serif",
+                  fontSize: "0.75rem",
+                  letterSpacing: "0.10em",
+                  color: isSpecial ? "#FF2D55" : "#555",
+                  transform: "skewX(-6deg)",
+                }}
+              >
+                {group.label.toUpperCase()}
+              </Box>
+              <Box sx={{ flex: 1, height: "2px", bgcolor: isSpecial ? "#FF2D5522" : "#1a1a1a" }} />
+            </Box>
+
+            <Box sx={{ px: 2 }}>
+              {group.matches.map(({ match, originalIndex }) => (
+                <MatchCard
+                  key={match.id}
+                  match={match}
+                  anchor={originalIndex === anchorIndex}
+                />
+              ))}
+            </Box>
           </Box>
-        </Box>
-      ))}
-      <div ref={anchorRef} />
+        );
+      })}
     </Box>
   );
 }
