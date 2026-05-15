@@ -8,6 +8,7 @@ import {
   Chip,
   Typography,
 } from "@mui/material";
+import Link from "next/link";
 import { differenceInCalendarDays, format, parseISO } from "date-fns";
 
 interface Props {
@@ -148,7 +149,7 @@ export default function MatchCard({ match, anchor }: Props) {
         scrollMarginTop: anchor ? 72 : 0,
       }}
     >
-      <CardActionArea sx={{ px: 2, py: 1.5 }}>
+      <CardActionArea component={Link} href={`/matches/${match.id}`} sx={{ px: 2, py: 1.5 }}>
         <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 1 }}>
           <Typography variant="caption" color="text.secondary">
             {formatMatchDate(match.date)}

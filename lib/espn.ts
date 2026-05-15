@@ -308,6 +308,189 @@ export async function fetchStandings(): Promise<StandingRow[]> {
   }));
 }
 
+export interface MatchGoal {
+  minute: string;
+  scorer: string;
+  teamId: string;
+  ownGoal: boolean;
+  penalty: boolean;
+}
+
+export interface MatchStat {
+  name: string;
+  label: string;
+  homeValue: string;
+  awayValue: string;
+}
+
+export interface MatchDetail extends Match {
+  goals: MatchGoal[];
+  stats: MatchStat[];
+  broadcasts: string[];
+}
+
+interface EspnScoringPlay {
+  clock?: { displayValue?: string };
+  team?: { id?: string };
+  participants?: { athlete?: { displayName?: string } }[];
+  type?: { text?: string };
+  text?: string;
+}
+
+interface EspnBoxscoreTeam {
+  team?: { id?: string };
+  statistics?: { name?: string; label?: string; displayValue?: string }[];
+}
+
+interface EspnSummary {
+  header?: {
+    competitions?: {
+      competitors?: EspnCompetitor[];
+      status?: EspnStatus;
+      date?: string;
+      venue?: { fullName?: string; address?: { city?: string; state?: string } };
+      broadcasts?: { media?: { shortName?: string }; names?: string[] }[];
+    }[];
+  };
+  scoringPlays?: EspnScoringPlay[];
+  boxscore?: { teams?: EspnBoxscoreTeam[] };
+}
+
+function parseSummaryGoals(plays: EspnScoringPlay[]): MatchGoal[] {
+  return plays.flatMap((p) => {
+    const typeText = p.type?.text ?? "";
+    const isGoal =
+      typeText.toLowerCase().includes("goal") ||
+      typeText.toLowerCase().includes("score");
+    if (!isGoal) return [];
+    const scorer =
+      p.participants?.[0]?.athlete?.displayName ??
+      p.text ??
+      "Unknown";
+    const ownGoal = typeText.toLowerCase().includes("own goal");
+    const penalty =
+      typeText.toLowerCase().includes("penalty") ||
+      typeText.toLowerCase().includes("pk");
+    return [
+      {
+        minute: p.clock?.displayValue ?? "",
+        scorer,
+        teamId: p.team?.id ?? "",
+        ownGoal,
+        penalty,
+      },
+    ];
+  });
+}
+
+const STAT_LABELS: Record<string, string> = {
+  possessionPct: "Possession",
+  shotsTotal: "Shots",
+  shots: "Shots",
+  shotsOnTarget: "Shots on Target",
+  saves: "Saves",
+  fouls: "Fouls",
+  yellowCards: "Yellow Cards",
+  redCards: "Red Cards",
+  offsides: "Offsides",
+  corners: "Corners",
+};
+
+const STAT_ORDER = [
+  "possessionPct",
+  "shots",
+  "shotsTotal",
+  "shotsOnTarget",
+  "saves",
+  "corners",
+  "fouls",
+  "offsides",
+  "yellowCards",
+  "redCards",
+];
+
+function parseSummaryStats(
+  boxscoreTeams: EspnBoxscoreTeam[],
+  homeId: string
+): MatchStat[] {
+  const home = boxscoreTeams.find((t) => t.team?.id === homeId) ?? boxscoreTeams[0];
+  const away = boxscoreTeams.find((t) => t.team?.id !== homeId) ?? boxscoreTeams[1];
+  if (!home || !away) return [];
+
+  const homeMap = new Map<string, string>(
+    (home.statistics ?? []).flatMap((s) => s.name ? [[s.name, s.displayValue ?? ""]] : [])
+  );
+  const awayMap = new Map<string, string>(
+    (away.statistics ?? []).flatMap((s) => s.name ? [[s.name, s.displayValue ?? ""]] : [])
+  );
+  const allNames = new Set<string>([...homeMap.keys(), ...awayMap.keys()]);
+
+  const ordered = STAT_ORDER.filter((n) => allNames.has(n));
+  for (const n of allNames) {
+    if (!ordered.includes(n)) ordered.push(n);
+  }
+
+  return ordered
+    .filter((n) => homeMap.has(n) || awayMap.has(n))
+    .map((n) => ({
+      name: n,
+      label: STAT_LABELS[n] ?? n,
+      homeValue: homeMap.get(n) ?? "0",
+      awayValue: awayMap.get(n) ?? "0",
+    }));
+}
+
+export async function fetchMatchDetail(eventId: string): Promise<MatchDetail | null> {
+  try {
+    const res = await fetch(`${BASE}/summary?event=${eventId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data: EspnSummary = await res.json();
+
+    const comp = data.header?.competitions?.[0];
+    if (!comp) return null;
+
+    const home = comp.competitors?.find((c) => c.homeAway === "home");
+    const away = comp.competitors?.find((c) => c.homeAway === "away");
+    if (!home || !away) return null;
+
+    const fakeEvent: EspnEvent = {
+      id: eventId,
+      date: comp.date ?? "",
+      name: "",
+      shortName: "",
+      competitions: [
+        {
+          id: eventId,
+          date: comp.date ?? "",
+          venue: comp.venue as EspnEvent["competitions"][0]["venue"],
+          competitors: comp.competitors ?? [],
+          status: comp.status ?? ({} as EspnStatus),
+          broadcasts: [],
+        },
+      ],
+      status: comp.status ?? ({} as EspnStatus),
+    };
+
+    const base = mapEvent(fakeEvent);
+    if (!base) return null;
+
+    const goals = parseSummaryGoals(data.scoringPlays ?? []);
+    const stats = parseSummaryStats(
+      data.boxscore?.teams ?? [],
+      home.team.id
+    );
+
+    const broadcasts = (comp.broadcasts ?? []).flatMap((b) => {
+      if (b.media?.shortName) return [b.media.shortName];
+      return b.names ?? [];
+    });
+
+    return { ...base, goals, stats, broadcasts };
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchTeams(): Promise<Team[]> {
   const res = await fetch(`${BASE}/teams?limit=50`, { cache: "no-store" });
   if (!res.ok) return [];
