@@ -1,11 +1,15 @@
 import type { Metadata, Viewport } from "next";
-import { Roboto } from "next/font/google";
-import MuiRegistry from "@/lib/MuiRegistry";
+import { Archivo_Black } from "next/font/google";
 import BottomNav from "@/components/BottomNav";
 import ServiceWorkerRegistrar from "@/components/ServiceWorkerRegistrar";
-import Box from "@mui/material/Box";
+import "./globals.css";
 
-const roboto = Roboto({ subsets: ["latin"], weight: ["300", "400", "500", "700"] });
+const archivoBlack = Archivo_Black({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-archivo",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "NWSL",
@@ -26,20 +30,18 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  themeColor: "#1a1a2e",
+  themeColor: "#0a0a0a",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={roboto.className} style={{ margin: 0 }}>
-        <MuiRegistry>
-          <Box sx={{ pb: "56px", minHeight: "100dvh", bgcolor: "background.default" }}>
-            {children}
-          </Box>
-          <BottomNav />
-          <ServiceWorkerRegistrar />
-        </MuiRegistry>
+    <html lang="en" className={archivoBlack.variable}>
+      <body style={{ margin: 0, fontFamily: "var(--font-archivo), system-ui, sans-serif" }}>
+        <main style={{ paddingBottom: 64, minHeight: "100dvh" }}>
+          {children}
+        </main>
+        <BottomNav />
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );
